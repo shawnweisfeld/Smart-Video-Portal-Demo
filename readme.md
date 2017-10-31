@@ -35,16 +35,20 @@
 1. In a Web Browser Login to the [Azure Portal](https://portal.azure.com)
 1. We will also like to work with Azure via the console so that we can automate things, so lets also login via the CLI.
 
-```bash
-az login
-```
+ ```bash
+ az login
+ ```
 
-> The CLI will prompt you to open a web browser to [https://aka.ms/devicelogin](https://aka.ms/devicelogin) and enter a code. 
+ > The CLI will prompt you to open a web browser to [https://aka.ms/devicelogin](https://aka.ms/devicelogin) and enter a code. 
 
 1. Lets take a look at all the subscriptions that we have access to with this account. If you have more than one ensure that the one you want to use today is set to default.
 
-```bash
-az account list -o table
-```
+ ```bash
+ az account list -o table
+ ```
 
+1. If the wrong subscrption is selected you can change it
 
+ ```bash
+ az account set -s 'My Subscription Name'
+ ```

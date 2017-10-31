@@ -26,5 +26,21 @@
 
 1. [Windows Subsystem for Linux - Install for Windows 10](https://msdn.microsoft.com/en-us/commandline/wsl/install-win10) *if running Windows*
 1. [Azure CLI](https://docs.microsoft.com/en-us/cli/azure/install-azure-cli?view=azure-cli-latest#install-on-debianubuntu-with-apt-get) 
-1. [Azure Account](https://azure.microsoft.com/en-us/free/) with access to the [Azure Portal](https://portal.azure.com)
+1. Azure Account: you can get a free one [here](https://azure.microsoft.com/en-us/free/)
+
+## The Process
+
+### Login and Setup Hello World Python App
+
+1. In a Web Browser Login to the [Azure Portal](https://portal.azure.com)
+1. Via a Bash Shell Login to Azure
+
+>> We are going to view resources in the portal, however in most cases create them via the CLI
+
+```bash
+az login
+```
+
+>> The CLI will prompt you to open a web browser to [https://aka.ms/devicelogin](https://aka.ms/devicelogin) and enter a code.
+
 

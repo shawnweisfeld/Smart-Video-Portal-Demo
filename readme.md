@@ -75,13 +75,22 @@
 
     > NOTE: the name of your web app must be globally unique. For demo purposes I put my name in mine.
 
-1. We can now open our web app in the browser, but we will need to know the defaul host name, you can get it from the json output from the prior setp or by running the followin command.
+1. We can now open our web app in the browser, but we will need to know the default host name, you can get it from the json output from the prior setp or by running the following command.
 
     ```bash
     az webapp show --resource-group svpdResourceGroup --name sweisfel-svpd
     ```
 
-    > You should now see a Hello World type webpage telling you that your site online and setup to run python.
+    > You should now see a blue webpage telling you that your site online and setup to run python.
+
+### Lets add our own hello world python code to our application
+
+1. Copy the following files to your local repo
+    1. [app.py](https://github.com/shawnweisfeld/Smart-Video-Portal-Demo/blob/c7e3509b7f61233233dc340614274a5c13b03af9/app.py): here we have a simple hello world python script. [More Info](https://docs.microsoft.com/en-us/azure/app-service/web-sites-python-configure#wsgi-handler)
+    1. [ptvs_virtualenv_proxy.py](https://github.com/shawnweisfeld/Smart-Video-Portal-Demo/blob/c7e3509b7f61233233dc340614274a5c13b03af9/ptvs_virtualenv_proxy.py): Virtual Environment Proxy retrieve the WSGI handler, activate the virtual environment and log errors. [More Info](https://docs.microsoft.com/en-us/azure/app-service/web-sites-python-configure#virtual-environment-proxy)
+    1. [requirements.txt](https://github.com/shawnweisfeld/Smart-Video-Portal-Demo/blob/c7e3509b7f61233233dc340614274a5c13b03af9/requirements.txt): Packages that you want Azure to include. [More Info](https://docs.microsoft.com/en-us/azure/app-service/web-sites-python-configure#package-management)
+    1. [runtime.txt](https://github.com/shawnweisfeld/Smart-Video-Portal-Demo/blob/c7e3509b7f61233233dc340614274a5c13b03af9/runtime.txt): What version of the python runtime do you want to use. [More Info](https://docs.microsoft.com/en-us/azure/app-service/web-sites-python-configure#python-version)
+    1. [web.config](https://github.com/shawnweisfeld/Smart-Video-Portal-Demo/blob/c7e3509b7f61233233dc340614274a5c13b03af9/web.config): This tells the server how to handle requests. [More Info](https://docs.microsoft.com/en-us/azure/app-service/web-sites-python-configure#webconfig) 
 
 ### Lets Setup Continuous deployment from our Git Repo to Azue Webapp
 

@@ -83,14 +83,9 @@
 
     > You should now see a blue webpage telling you that your site online and setup to run python.
 
-### Lets add our own hello world python code to our application
+### Lets setup Django for our application
 
-1. Copy the following files to your local repo
-    1. [app.py](https://github.com/shawnweisfeld/Smart-Video-Portal-Demo/blob/c7e3509b7f61233233dc340614274a5c13b03af9/app.py): here we have a simple hello world python script. [More Info](https://docs.microsoft.com/en-us/azure/app-service/web-sites-python-configure#wsgi-handler)
-    1. [ptvs_virtualenv_proxy.py](https://github.com/shawnweisfeld/Smart-Video-Portal-Demo/blob/c7e3509b7f61233233dc340614274a5c13b03af9/ptvs_virtualenv_proxy.py): Virtual Environment Proxy retrieve the WSGI handler, activate the virtual environment and log errors. [More Info](https://docs.microsoft.com/en-us/azure/app-service/web-sites-python-configure#virtual-environment-proxy)
-    1. [requirements.txt](https://github.com/shawnweisfeld/Smart-Video-Portal-Demo/blob/c7e3509b7f61233233dc340614274a5c13b03af9/requirements.txt): Packages that you want Azure to include. [More Info](https://docs.microsoft.com/en-us/azure/app-service/web-sites-python-configure#package-management)
-    1. [runtime.txt](https://github.com/shawnweisfeld/Smart-Video-Portal-Demo/blob/c7e3509b7f61233233dc340614274a5c13b03af9/runtime.txt): What version of the python runtime do you want to use. [More Info](https://docs.microsoft.com/en-us/azure/app-service/web-sites-python-configure#python-version)
-    1. [web.config](https://github.com/shawnweisfeld/Smart-Video-Portal-Demo/blob/c7e3509b7f61233233dc340614274a5c13b03af9/web.config): This tells the server how to handle requests. [More Info](https://docs.microsoft.com/en-us/azure/app-service/web-sites-python-configure#webconfig) 
+1. Copy Django Python Sample from [here](https://github.com/Azure-Samples/app-service-web-python-get-started) into our repo.
 
 ### Lets Setup Continuous deployment from our Git Repo to Azue Webapp
 
@@ -103,3 +98,27 @@
     > Here we are setting up a super simple deployment, however in the real world we would likely want to deploy to multiple environments with signoffs between each. VisualStudio.com has a great build/release pipeline that can handle these more complex requirements. 
 
     > Generate the GitHub token [here](https://github.com/settings/tokens). I gave mine the following permissions admin:repo_hook, notifications
+
+1. You should now see our simple hello world app running. Now we have our environment all setup and we can begin adding functionality. 
+
+### Lets upload our video to Azure Blob storage
+
+1. Create a storage account to store our video
+
+    ```bash
+    az storage account create -n svpdstorageaccount -g svpdResourceGroup -l "South Central US" --sku Standard_LRS
+    ```
+
+1. Get the admin key for our storage account. Azure creates 2 keys a primary and a secondary allowing for seamless key rotations. 
+
+    ```bash
+    az storage account keys list -n svpdstorageaccount -g svpdResourceGroup
+    ```
+
+1. Create a storage container to place our uploaded video
+
+    ```bash
+    az storage container create -n uploadedvideo --account-name svpdstorageaccount --account-key YOURKEY
+    ```
+
+1. 

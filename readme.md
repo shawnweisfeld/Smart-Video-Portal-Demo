@@ -15,24 +15,74 @@
 
 ## Resources
 
-1. [Python Developer Center](https://azure.microsoft.com/en-us/develop/python/)
-1. [Create a Python web app in Azure](https://docs.microsoft.com/en-us/azure/app-service/app-service-web-get-started-python)
-1. [Configuring Python with Azure App Service Web Apps](https://docs.microsoft.com/en-us/azure/app-service/web-sites-python-configure)
+### Azure Media Services & Cognitive Services
 1. [Azure Media Services – On-demand Streaming Learning Path](https://azure.microsoft.com/en-gb/documentation/learning-paths/media-services-streaming-on-demand/)
 1. [Translator API](https://docs.microsoft.com/en-us/azure/cognitive-services/translator/translator-info-overview)
 1. [Speech API](https://docs.microsoft.com/en-us/azure/cognitive-services/speech/home)
 1. [Content Moderation API](https://docs.microsoft.com/en-us/azure/cognitive-services/content-moderator/overview)
 
+### Python & Azure App Service (using Linux containers)
+1. [Python Developer Center](https://azure.microsoft.com/en-us/develop/python/)
+1. [Use a custom Docker image for Web App for Containers](https://docs.microsoft.com/en-us/azure/app-service/containers/tutorial-custom-docker-image)
+1. [Continuous deployment with Web App for Containers](https://docs.microsoft.com/en-us/azure/app-service/containers/app-service-linux-ci-cd)
 
 ## Prerequisites
 
-1. [Windows Subsystem for Linux - Install for Windows 10](https://msdn.microsoft.com/en-us/commandline/wsl/install-win10) *if running Windows*
+1. [Windows Subsystem for Linux](https://msdn.microsoft.com/en-us/commandline/wsl/install-win10)
+1. [Docker Community Edition for Windows](https://store.docker.com/editions/community/docker-ce-desktop-windows)
 1. [Azure CLI](https://docs.microsoft.com/en-us/cli/azure/install-azure-cli?view=azure-cli-latest#install-on-debianubuntu-with-apt-get) 
 1. Azure Account: you can get a free one [here](https://azure.microsoft.com/en-us/free/)
 
 ## The Process
 
-### Login and Setup Hello World Python App
+### Create a Django container locally
+
+1. Clone the sample app from GitHub
+
+    ```bash
+    git clone https://github.com/Azure-Samples/docker-django-webapp-linux.git --config core.autocrlf=input
+    cd docker-django-webapp-linux
+    ```
+
+1. Connect Docker in the Linux subsystem to Docker running on the Windows Host
+
+    1. Right click on the docker icon in the system tray, select settings
+    1. On the general tab, check the box to `expose the daemon without TLS`
+    1. Execute the following command
+
+        ```bash
+        export DOCKER_HOST=tcp://127.0.0.1:2375
+        ```
+
+1. Build the image from the `Docker` file
+
+    ```bash
+    docker build --tag <docker-id>/smartvideoportal:v1.0.0 .
+    ```
+
+1. You can now run it locally with the following command
+
+    ```bash
+    docker run -d -p 2222:8000 <docker-id>/smartvideoportal:v1.0.0
+    ```
+
+1. Open a browser to [http://localhost:2222](http://localhost:2222) and view your handywork
+
+### Push your Django container to Docker Hub
+
+1. Login to Docker Hub
+
+    ```bash
+    docker login --username <docker-id> --password <docker-hub-password>
+    ```
+
+1. Push the container to the registry
+
+    ```bash
+    docker push <docker-id>/smartvideoportal:v1.0.0
+    ```
+
+### Deploy to Azure AppService
 
 1. In a Web Browser Login to the [Azure Portal](https://portal.azure.com)
 1. We will also like to work with Azure via the console so that we can automate things, so lets also login via the CLI.
@@ -64,95 +114,64 @@
 1. Create an App Service Plan to deploy our app into
 
     ```bash
-    az appservice plan create --name svpdAppServicePlan --resource-group svpdResourceGroup --sku FREE
+    az appservice plan create --name svpdAppServicePlan --resource-group svpdResourceGroup --sku S1 --is-linux
     ```
 
-1. Create a Web App do deploy our app into
+1. Create a Web App and deploy our container into it
 
     ```bash
-    az webapp create --resource-group svpdResourceGroup --plan svpdAppServicePlan --name sweisfel-svpd --runtime "python|3.4"
+    az webapp create --resource-group svpdResourceGroup --plan svpdAppServicePlan --name sweisfel-svpd --deployment-container-image-name <docker-ID>/smartvideoportal:v1.0.0
     ```
 
     > NOTE: the name of your web app must be globally unique. For demo purposes I put my name in mine.
+    > After the above command completes it might take a min or so for your container to spin up and start accepting web requests
 
 1. We can now open our web app in the browser, but we will need to know the default host name, you can get it from the json output from the prior setp or by running the following command.
 
     ```bash
-    az webapp show --resource-group svpdResourceGroup --name sweisfel-svpd
+    az webapp list --resource-group svpdResourceGroup -o table
     ```
 
-    > You should now see a blue webpage telling you that your site online and setup to run python.
+### Lets Setup Continuous deployment from our Docker Hub Account to Azue Webapp
 
-### Lets setup Django for our application
-
-1. Install virtualenv and virtualenvwrapper 
-
-    > Instructions [from](https://askubuntu.com/questions/244641/how-to-set-up-and-use-a-virtual-python-environment-in-ubuntu)
+1. Every time we publish a new container to Docker Hub, we want Azure to be notified so that it can get it. Start by turning this feature on.
 
     ```bash
-    sudo apt-get install python-virtualenv
-    sudo apt install virtualenvwrapper
-    echo "source /usr/share/virtualenvwrapper/virtualenvwrapper.sh" >> ~/.bashrc
+    az webapp deployment container config --resource-group svpdResourceGroup --name sweisfel-svpd -e true
     ```
 
-1. Setup virtualenv and virtualenvwrapper
+1. In the json result from the last command you should see your webhook url, if you missed it you can obtain it with this command.
 
     ```bash
-    export WORKON_HOME=~/.virtualenvs
-    mkdir $WORKON_HOME
-    echo "export WORKON_HOME=$WORKON_HOME" >> ~/.bashrc
-    echo "export PIP_VIRTUALENV_BASE=$WORKON_HOME" >> ~/.bashrc 
-    source ~/.bashrc
+    az webapp deployment container show-cd-url --resource-group svpdResourceGroup --name sweisfel-svpd
     ```
 
-1. Make a virtualenv
+1. In Docker Hub, find the repository that our container is in.
+1. Then click on the "Webhooks" menu.
+1. Then press the + to create a new one
+1. Name it `Smart Video Portal App Service` and paste in the URL we got from Azure
+
+### Lets make a small change to our application, build a new container, test it locally, push the container to docker hub, and then test it in Azure
+
+1. Open up the static index page it is located here: \app\templates\app\index.html
+1. Replace the tag line "Build, deploy and scale applications faster" on line 23 with "I Love Azure" and save the file
+1. Build the container (dont forget to increment the build number in the docker tag)
 
     ```bash
-    mkvirtualenv --python=/usr/bin/python3 smartvideodemo
+    docker build --tag <docker-id>/smartvideoportal:v1.0.1 .
     ```
 
-    > NOTE you can leave, come back, and delete your virtualenv with the following commands
+1. Run the following command to test the container locally, then view it in the browser at [http://localhost:2222](http://localhost:2222)
 
     ```bash
-    deactivate
-    workon smartvideodemo
-    rmvirtualenv smartvideodemo
+    docker run -d -p 2222:8000 <docker-id>/smartvideoportal:v1.0.1
     ```
 
-1. Install Django
+1. Push the container to Docker Hub    
 
     ```bash
-    pip install Django 
+    docker push <docker-id>/smartvideoportal:v1.0.1
     ```
-
-1. Create the Django project
-
-    ```bash
-    django-admin startproject smartvideo
-    ```
-
-1. We can now test our default project is running using the Django webserver. 
-
-    ```bash
-    python3 manage.py runserver
-    ```
-
-    Now you can open up your web browser and view our project at [http://127.0.0.1:8000/](http://127.0.0.1:8000/)
-
-
-### Lets Setup Continuous deployment from our Git Repo to Azue Webapp
-
-1. Every time we check code into our master brach on GitHub we want to notify our Azure Webapp. It will then pull our code over, compile it and update our site. 
-
-    ```bash
-    az webapp deployment source config --resource-group svpdResourceGroup --name sweisfel-svpd --repo-url https://github.com/shawnweisfeld/Smart-Video-Portal-Demo --branch master --repository-type github --git-token YOURKEY
-    ```
-    
-    > Here we are setting up a super simple deployment, however in the real world we would likely want to deploy to multiple environments with signoffs between each. VisualStudio.com has a great build/release pipeline that can handle these more complex requirements. 
-
-    > Generate the GitHub token [here](https://github.com/settings/tokens). I gave mine the following permissions admin:repo_hook, notifications
-
-1. You should now see our simple hello world app running. Now we have our environment all setup and we can begin adding functionality. 
 
 ### Lets upload our video to Azure Blob storage
 

@@ -155,7 +155,7 @@
 
 1. Open up the static index page it is located here: \app\templates\app\index.html
 1. Replace the tag line "Build, deploy and scale applications faster" on line 23 with "I Love Azure" and save the file
-1. Build the container (dont forget to increment the build number in the docker tag)
+1. Build the container
 
     ```bash
     docker build --tag <docker-id>/smartvideoportal:v1.0.0 .

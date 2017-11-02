@@ -85,7 +85,60 @@
 
 ### Lets setup Django for our application
 
-1. Copy Django Python Sample from [here](https://github.com/Azure-Samples/app-service-web-python-get-started) into our repo.
+1. Install virtualenv and virtualenvwrapper 
+
+    > Instructions [from](https://askubuntu.com/questions/244641/how-to-set-up-and-use-a-virtual-python-environment-in-ubuntu)
+
+    ```bash
+    sudo apt-get install python-virtualenv
+    sudo apt install virtualenvwrapper
+    echo "source /usr/share/virtualenvwrapper/virtualenvwrapper.sh" >> ~/.bashrc
+    ```
+
+1. Setup virtualenv and virtualenvwrapper
+
+    ```bash
+    export WORKON_HOME=~/.virtualenvs
+    mkdir $WORKON_HOME
+    echo "export WORKON_HOME=$WORKON_HOME" >> ~/.bashrc
+    echo "export PIP_VIRTUALENV_BASE=$WORKON_HOME" >> ~/.bashrc 
+    source ~/.bashrc
+    ```
+
+1. Make a virtualenv
+
+    ```bash
+    mkvirtualenv --python=/usr/bin/python3 smartvideodemo
+    ```
+
+    > NOTE you can leave, come back, and delete your virtualenv with the following commands
+
+    ```bash
+    deactivate
+    workon smartvideodemo
+    rmvirtualenv smartvideodemo
+    ```
+
+1. Install Django
+
+    ```bash
+    pip install Django 
+    ```
+
+1. Create the Django project
+
+    ```bash
+    django-admin startproject smartvideo
+    ```
+
+1. We can now test our default project is running using the Django webserver. 
+
+    ```bash
+    python3 manage.py runserver
+    ```
+
+    Now you can open up your web browser and view our project at [http://127.0.0.1:8000/](http://127.0.0.1:8000/)
+
 
 ### Lets Setup Continuous deployment from our Git Repo to Azue Webapp
 

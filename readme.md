@@ -158,19 +158,19 @@
 1. Build the container (dont forget to increment the build number in the docker tag)
 
     ```bash
-    docker build --tag <docker-id>/smartvideoportal:v1.0.1 .
+    docker build --tag <docker-id>/smartvideoportal:v1.0.0 .
     ```
 
 1. Run the following command to test the container locally, then view it in the browser at [http://localhost:2222](http://localhost:2222)
 
     ```bash
-    docker run -d -p 2222:8000 <docker-id>/smartvideoportal:v1.0.1
+    docker run -d -p 2222:8000 <docker-id>/smartvideoportal:v1.0.0
     ```
 
 1. Push the container to Docker Hub    
 
     ```bash
-    docker push <docker-id>/smartvideoportal:v1.0.1
+    docker push <docker-id>/smartvideoportal:v1.0.0
     ```
 
 ### Lets upload our video to Azure Blob storage

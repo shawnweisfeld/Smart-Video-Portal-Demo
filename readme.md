@@ -173,6 +173,26 @@
     docker push <docker-id>/smartvideoportal:v1.0.0
     ```
 
+### Local Development with your Docker Container
+
+1. Turn on "Shared Drives" in your Docker Settings (right click on the docker logo in the system tray)
+1. Create a Dev version of your docker file that doesn't copy our application into the container. It should look like [this]().
+1. Build the container
+
+    ```bash
+    docker build --tag smartvideoportaldev -f Dev.Dockerfile . 
+    ```
+
+    > note that we using the `-f` flag to point to the dev version of the dockerfile
+
+1. Run the following command to test the container locally, then view it in the browser at [http://localhost:2222](http://localhost:2222)
+
+    ```bash
+    docker run -d -p 2222:8000 -v //c/Users/sweisfel/<path to your code>:/code smartvideoportaldev
+    ```
+
+    > note that we are telling docker to "mount" our windows drive inside the container. This means that any code changes we make are immidiatly available.
+        
 ### Lets upload our video to Azure Blob storage
 
 1. Create a storage account to store our video

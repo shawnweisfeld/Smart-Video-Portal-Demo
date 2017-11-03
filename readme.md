@@ -167,7 +167,7 @@
     docker run -d -p 2222:8000 <docker-id>/smartvideoportal:v1.0.0
     ```
 
-1. Push the container to Docker Hub    
+1. Push the container to Docker Hub, within a few minutes you should see your changes on your Azure WebApp   
 
     ```bash
     docker push <docker-id>/smartvideoportal:v1.0.0
@@ -176,7 +176,7 @@
 ### Local Development with your Docker Container
 
 1. Turn on "Shared Drives" in your Docker Settings (right click on the docker logo in the system tray)
-1. Create a Dev version of your docker file that doesn't copy our application into the container. It should look like [this]().
+1. Create a Dev version of your docker file that doesn't copy our application into the container. It should look like [this](https://github.com/shawnweisfeld/Smart-Video-Portal-Demo/blob/master/Dev.Dockerfile).
 1. Build the container
 
     ```bash

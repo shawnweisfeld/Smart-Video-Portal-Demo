@@ -177,6 +177,7 @@
 
 1. Turn on "Shared Drives" in your Docker Settings (right click on the docker logo in the system tray)
 1. Create a Dev version of your docker file that doesn't copy our application into the container. It should look like [this](https://github.com/shawnweisfeld/Smart-Video-Portal-Demo/blob/master/Dev.Dockerfile).
+1. Create a dev.env key=value file to inject your environment variables into the container during local runs.
 1. Build the container
 
     ```bash
@@ -188,7 +189,7 @@
 1. Run the following command to test the container locally, then view it in the browser at [http://localhost:2222](http://localhost:2222)
 
     ```bash
-    docker run -d -p 2222:8000 -v //c/Users/sweisfel/<path to your code>:/code smartvideoportaldev
+    docker run -d -p 2222:8000 -v //c/Users/sweisfel/<path to your code>:/code --env-file dev.env smartvideoportaldev
     ```
 
     > note that we are telling docker to "mount" our windows drive inside the container. This means that any code changes we make are immidiatly available.

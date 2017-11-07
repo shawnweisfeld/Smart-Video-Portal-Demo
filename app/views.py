@@ -45,3 +45,17 @@ def upload_file(request):
 
     return HttpResponse(template.render({ }, request))
 
+def render_video(request):
+    template = loader.get_template('app/render_video.html')
+    vidstatus = 'No Video Found.'
+
+    queue_service = QueueService(account_name=os.environ['SVPD_STORAGE_ACCOUNT_NAME'], account_key=os.environ['SVPD_STORAGE_ACCOUNT_KEY'])
+    messages = queue_service.get_messages(os.environ['SVPD_STORAGE_ACCOUNT_READY_TO_ENCODE'], num_messages=1, visibility_timeout=5*60)
+    
+    for message in messages:
+        vidstatus = 'Queued for Rendering: ' + message.content
+        queue_service.delete_message(os.environ['SVPD_STORAGE_ACCOUNT_READY_TO_ENCODE'], message.id, message.pop_receipt)   
+
+    return HttpResponse(template.render({
+        'vidstatus': vidstatus,
+    }, request))

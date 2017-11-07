@@ -214,4 +214,24 @@
     az storage container create -n uploadedvideo --account-name svpdstorageaccount --account-key YOURKEY
     ```
 
-1. 
+1. Create a storage queue to list videos ready to go to Azure Media Services
+
+    ```bash
+    az storage queue create -n videos-to-encode --account-name svpdstorageaccount --account-key YOURKEY
+    ```
+
+1. Now we can use the Azure Storage python SDK to upload our file to storage. [More Info](https://docs.microsoft.com/en-us/azure/storage/blobs/storage-python-how-to-use-blob-storage)
+
+    ```python
+    block_blob_service = BlockBlobService(account_name=os.environ['SVPD_STORAGE_ACCOUNT_NAME'], account_key=os.environ['SVPD_STORAGE_ACCOUNT_KEY'])
+    block_blob_service.create_blob_from_bytes(os.environ['SVPD_STORAGE_ACCOUNT_UPLOADED'], myfile.name, myfile.read())
+    ```
+
+1. Next lets toss a message into a storage queue saying that our video is uploaded and ready for processing. [More Info](https://docs.microsoft.com/en-us/azure/storage/queues/storage-python-how-to-use-queue-storage)    
+
+    ```python
+    queue_service = QueueService(account_name=os.environ['SVPD_STORAGE_ACCOUNT_NAME'], account_key=os.environ['SVPD_STORAGE_ACCOUNT_KEY'])
+    queue_service.put_message(os.environ['SVPD_STORAGE_ACCOUNT_READY_TO_ENCODE'], filename)    
+    ```
+
+    

@@ -328,10 +328,10 @@
         ```
 
     1. With the helper methods out of the way we can now, process the video. The process is:
-        1. Do we have a video in the queue to get processed
+        1. Do we have a video in the queue to get processed?
         1. Authenticate against AMS
-        1. Create an Asset to hold our files
-        1. Create an Asset File to hold our file
+        1. Create an Asset to hold our Asset Files
+        1. Create an Asset File to hold our video file
         1. Copy the video from the upload location into the container created by the Asset
         1. Create a job with two tasks to process the file
             1. The first task transcodes the video for adaptive streaming

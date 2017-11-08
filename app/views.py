@@ -1,7 +1,7 @@
 """
 Definition of views.
 """
-import os, random, string, uuid, datetime, azurerm, json, http.client, urllib
+import os, random, string, uuid, datetime, json, http.client, urllib
 from django.template import loader
 from django.shortcuts import render
 from django.conf import settings
@@ -104,45 +104,6 @@ def ams_verbose_post_request(access_token, path, payload):
     res = conn.getresponse()
     return json.loads(res.read().decode("utf-8"))    
 
-def ams_merge_request(access_token, path, id, payload):
-    requrl = urllib.parse.urlparse(os.environ['AMS_API_ENDPOINT'] + path)
-    conn = http.client.HTTPSConnection(requrl.netloc)
-
-    headers = {
-        'x-ms-version': "2.11",
-        'accept': "application/json",
-        'content-type': "application/json",
-        'dataserviceversion': "3.0",
-        'maxdataserviceversion': "3.0",
-        'authorization': "Bearer " + access_token,
-        'cache-control': "no-cache"
-        }
-
-    conn.request("PATCH", requrl.path + '(\''+ urllib.parse.quote_plus(id) + '\')', json.dumps(payload), headers)
-    res = conn.getresponse()
-    return ''
-
-
-def ams_get_request(access_token, path, payload):
-    requrl = urllib.parse.urlparse(os.environ['AMS_API_ENDPOINT'] + path)
-    querystring = '?' + urllib.parse.urlencode(payload)
-    conn = http.client.HTTPSConnection(requrl.netloc)
-
-    headers = {
-        'x-ms-version': "2.11",
-        'accept': "application/json",
-        'content-type': "application/json",
-        'dataserviceversion': "3.0",
-        'maxdataserviceversion': "3.0",
-        'authorization': "Bearer " + access_token,
-        'cache-control': "no-cache"
-        }
-
-    conn.request("GET", requrl.path + querystring, '', headers)
-    res = conn.getresponse()
-    return json.loads(res.read().decode("utf-8"))
-
-
 def render_video(request):
     template = loader.get_template('app/render_video.html')
     vidstatus = 'No Video Found.'
@@ -166,6 +127,7 @@ def render_video(request):
             'IsEncrypted': 'false',
             'IsPrimary': 'false',
             'MimeType': 'video/mp4',
+            'ContentFileSize': message_obj['size'],
             'Name': message_obj['filename'],
             'ParentAssetId': asset['Id']})
 
@@ -173,24 +135,19 @@ def render_video(request):
         from_url = block_blob_service.make_blob_url(os.environ['SVPD_STORAGE_ACCOUNT_UPLOADED'], message_obj['folder'] + '/' + message_obj['filename'])
         block_blob_service.copy_blob(asset_container, message_obj['filename'], from_url)
 
-        ams_merge_request(access_token, "Files", asset_file['Id'], {
-            'ContentFileSize': message_obj['size'],
-            'Id': asset_file['Id'],
-            'MimeType': 'video/mp4',
-            'Name': message_obj['filename'],
-            'ParentAssetId': asset['Id']})
-
         job = ams_verbose_post_request(access_token, "Jobs", {
             'Name': message_obj['filename'], 
             'InputMediaAssets': [{
                 '__metadata': { 'uri': os.environ['AMS_API_ENDPOINT'] + 'Assets(\'' + asset['Id'] + '\')' }
             }],
             'Tasks': [{
+                'Name': 'Adaptive Streaming Task',
                 'Configuration': 'Adaptive Streaming',
                 'MediaProcessorId': 'nb:mpid:UUID:ff4df607-d419-42f0-bc17-a481b1331e56',
                 'TaskBody': '<?xml version="1.0" encoding="utf-16"?><taskBody><inputAsset>JobInputAsset(0)</inputAsset><outputAsset assetCreationOptions="0" assetFormatOption="0" assetName="' + message_obj['filename'] + ' - MES v1.1" storageAccountName="' + os.environ['SVPD_STORAGE_ACCOUNT_NAME'] + '">JobOutputAsset(0)</outputAsset></taskBody>'
             },{
-                'Configuration': '<?xml version="1.0" encoding="utf-8"?><configuration version="2.0"><input><metadata key="title" value="Azure Friday - Azure Cosmos DB API for Mongo DB" /></input><settings></settings><features><feature name="ASR"><settings><add key="Language" value="English" /><add key="GenerateAIB" value="False" /><add key="GenerateKeywords" value="True" /><add key="ForceFullCaption" value="False" /><add key="CaptionFormats" value="ttml;sami;webvtt" /></settings></feature></features></configuration>',
+                'Name': 'Indexing Task',
+                'Configuration': '<?xml version="1.0" encoding="utf-8"?><configuration version="2.0"><input><metadata key="title" value="blah" /></input><settings></settings><features><feature name="ASR"><settings><add key="Language" value="English" /><add key="GenerateAIB" value="False" /><add key="GenerateKeywords" value="True" /><add key="ForceFullCaption" value="False" /><add key="CaptionFormats" value="ttml;sami;webvtt" /></settings></feature></features></configuration>',
                 'MediaProcessorId': 'nb:mpid:UUID:233e57fc-36bb-4f6f-8f18-3b662747a9f8',
                 'TaskBody': '<?xml version="1.0" encoding="utf-16"?><taskBody><inputAsset>JobInputAsset(0)</inputAsset><outputAsset assetCreationOptions="0" assetFormatOption="0" assetName="' + message_obj['filename'] + ' - Indexed" storageAccountName="' + os.environ['SVPD_STORAGE_ACCOUNT_NAME'] + '">JobOutputAsset(1)</outputAsset></taskBody>'
             }]

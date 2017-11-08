@@ -258,6 +258,7 @@
             1. REST API endpoint (AMS_API_ENDPOINT)
             1. Media Services Resource (AMS_RESOURCE)
     1. Add an additional environment variable for the STS endpoint AZURE_AD_STS=https://login.microsoftonline.com/<AZURE_AD_TENANT_DOMAIN>/oauth2/token
+    1. While we are still in the Azure portal lets start our streaming endpoint. [More Info](https://docs.microsoft.com/en-us/azure/media-services/media-services-streaming-endpoints-overview)
     
 1. Now we can use the AMS Rest endpoint to render our Adaptive Streaming and Closed Captioning files.
     1. First we will need to Authenticate agaist the AMS API, we can do that with the following
@@ -388,3 +389,27 @@
             ```
 
 ### Next we need to monitor for the job to complete and then collect the output files
+1. The first step is to create a new queue that we can monitor listing videos getting processed. 
+
+    > NOTE: We could have AMS list all jobs it has, but we don't know if we created those jobs
+    
+    ```bash
+    az storage queue create -n videos-encoding --account-name svpdstorageaccount --account-key YOURKEY
+    ```
+
+1. With our new queue created we can now add some code before we delete the videos-to-encode message to insert a videos-encoding message
+
+    ```python
+    queue_service.put_message(os.environ['SVPD_STORAGE_ACCOUNT_ENCODING'], json.dumps({ 
+        'filename': message_obj['filename'],
+        'folder': message_obj['folder'],
+        'size': message_obj['size'],
+        'job': job['d']}))    
+    ```
+
+1. poll queue for video
+copy all the index files from the done folder to the folder with the video
+delete the index done asset
+delete the source asset
+create a locator for the done folder
+get the url for the webvtt and manafest files

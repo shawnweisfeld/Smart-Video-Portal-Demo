@@ -102,7 +102,25 @@ def ams_verbose_post_request(access_token, path, payload):
 
     conn.request("POST", requrl.path, json.dumps(payload), headers)
     res = conn.getresponse()
-    return json.loads(res.read().decode("utf-8"))    
+    return json.loads(res.read().decode("utf-8"))   
+
+def ams_get_request(access_token, uri):
+    requrl = urllib.parse.urlparse(uri)
+    conn = http.client.HTTPSConnection(requrl.netloc)
+
+    headers = {
+        'x-ms-version': "2.11",
+        'accept': "application/json",
+        'content-type': "application/json",
+        'dataserviceversion': "3.0",
+        'maxdataserviceversion': "3.0",
+        'authorization': "Bearer " + access_token,
+        'cache-control': "no-cache"
+        }
+
+    conn.request("GET", requrl.path, '', headers)
+    res = conn.getresponse()
+    return json.loads(res.read().decode("utf-8"))     
 
 def render_video(request):
     template = loader.get_template('app/render_video.html')
@@ -152,6 +170,12 @@ def render_video(request):
                 'TaskBody': '<?xml version="1.0" encoding="utf-16"?><taskBody><inputAsset>JobInputAsset(0)</inputAsset><outputAsset assetCreationOptions="0" assetFormatOption="0" assetName="' + message_obj['filename'] + ' - Indexed" storageAccountName="' + os.environ['SVPD_STORAGE_ACCOUNT_NAME'] + '">JobOutputAsset(1)</outputAsset></taskBody>'
             }]
             })
+
+        queue_service.put_message(os.environ['SVPD_STORAGE_ACCOUNT_ENCODING'], json.dumps({ 
+            'filename': message_obj['filename'],
+            'folder': message_obj['folder'],
+            'size': message_obj['size'],
+            'job': job['d']}))
 
         queue_service.delete_message(os.environ['SVPD_STORAGE_ACCOUNT_READY_TO_ENCODE'], message.id, message.pop_receipt)   
 

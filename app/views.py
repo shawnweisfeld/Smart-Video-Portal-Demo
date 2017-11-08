@@ -1,7 +1,7 @@
 """
 Definition of views.
 """
-import os, random, string, uuid, datetime
+import os, random, string, uuid, datetime, azurerm, json, http.client, urllib
 from django.template import loader
 from django.shortcuts import render
 from django.conf import settings
@@ -29,7 +29,8 @@ def upload_file(request):
 
     if request.method == 'POST' and request.FILES['myfile']:
         myfile = request.FILES['myfile']
-        filename = datetime.datetime.now().strftime('%Y%m%d/')+str(uuid.uuid4()) + '/' + myfile.name
+        folder = datetime.datetime.now().strftime('%Y%m%d/')+str(uuid.uuid4())
+        filename = folder + '/' + myfile.name
 
         # save the file to Azure Storage
         block_blob_service = BlockBlobService(account_name=os.environ['SVPD_STORAGE_ACCOUNT_NAME'], account_key=os.environ['SVPD_STORAGE_ACCOUNT_KEY'])
@@ -37,7 +38,10 @@ def upload_file(request):
         
         # put a message into a queue letting the system know the video is ready for processing
         queue_service = QueueService(account_name=os.environ['SVPD_STORAGE_ACCOUNT_NAME'], account_key=os.environ['SVPD_STORAGE_ACCOUNT_KEY'])
-        queue_service.put_message(os.environ['SVPD_STORAGE_ACCOUNT_READY_TO_ENCODE'], filename)
+        queue_service.put_message(os.environ['SVPD_STORAGE_ACCOUNT_READY_TO_ENCODE'], json.dumps({ 
+            'filename': myfile.name,
+            'folder': folder,
+            'size': str(myfile.size)}))
 
         return HttpResponse(template.render({
             'uploaded_file_name': filename,
@@ -45,15 +49,153 @@ def upload_file(request):
 
     return HttpResponse(template.render({ }, request))
 
+def ams_authenticate():
+    stsurl = urllib.parse.urlparse(os.environ['AZURE_AD_STS'])
+    conn = http.client.HTTPSConnection(stsurl.netloc)
+    payload = urllib.parse.urlencode(
+        { 'grant_type': 'client_credentials', 
+          'client_id': os.environ['AMS_CLIENT_ID'], 
+          'client_secret': os.environ['AMS_CLIENT_SECRET'], 
+          'resource': os.environ['AMS_RESOURCE'] 
+        })
+
+    headers = {
+        'content-type': "application/x-www-form-urlencoded",
+        'cache-control': "no-cache",
+        }
+
+    conn.request("POST", stsurl.path, payload, headers)
+    res = conn.getresponse()
+    return json.loads(res.read().decode("utf-8"))
+
+def ams_post_request(access_token, path, payload):
+    requrl = urllib.parse.urlparse(os.environ['AMS_API_ENDPOINT'] + path)
+    conn = http.client.HTTPSConnection(requrl.netloc)
+
+    headers = {
+        'x-ms-version': "2.11",
+        'accept': "application/json",
+        'content-type': "application/json",
+        'dataserviceversion': "3.0",
+        'maxdataserviceversion': "3.0",
+        'authorization': "Bearer " + access_token,
+        'cache-control': "no-cache"
+        }
+
+    conn.request("POST", requrl.path, json.dumps(payload), headers)
+    res = conn.getresponse()
+    return json.loads(res.read().decode("utf-8"))
+
+def ams_verbose_post_request(access_token, path, payload):
+    requrl = urllib.parse.urlparse(os.environ['AMS_API_ENDPOINT'] + path)
+    conn = http.client.HTTPSConnection(requrl.netloc)
+
+    headers = {
+        'x-ms-version': "2.11",
+        'accept': "application/json;odata=verbose",
+        'content-type': "application/json;odata=verbose",
+        'dataserviceversion': "3.0",
+        'maxdataserviceversion': "3.0",
+        'authorization': "Bearer " + access_token,
+        'cache-control': "no-cache"
+        }
+
+    conn.request("POST", requrl.path, json.dumps(payload), headers)
+    res = conn.getresponse()
+    return json.loads(res.read().decode("utf-8"))    
+
+def ams_merge_request(access_token, path, id, payload):
+    requrl = urllib.parse.urlparse(os.environ['AMS_API_ENDPOINT'] + path)
+    conn = http.client.HTTPSConnection(requrl.netloc)
+
+    headers = {
+        'x-ms-version': "2.11",
+        'accept': "application/json",
+        'content-type': "application/json",
+        'dataserviceversion': "3.0",
+        'maxdataserviceversion': "3.0",
+        'authorization': "Bearer " + access_token,
+        'cache-control': "no-cache"
+        }
+
+    conn.request("PATCH", requrl.path + '(\''+ urllib.parse.quote_plus(id) + '\')', json.dumps(payload), headers)
+    res = conn.getresponse()
+    return ''
+
+
+def ams_get_request(access_token, path, payload):
+    requrl = urllib.parse.urlparse(os.environ['AMS_API_ENDPOINT'] + path)
+    querystring = '?' + urllib.parse.urlencode(payload)
+    conn = http.client.HTTPSConnection(requrl.netloc)
+
+    headers = {
+        'x-ms-version': "2.11",
+        'accept': "application/json",
+        'content-type': "application/json",
+        'dataserviceversion': "3.0",
+        'maxdataserviceversion': "3.0",
+        'authorization': "Bearer " + access_token,
+        'cache-control': "no-cache"
+        }
+
+    conn.request("GET", requrl.path + querystring, '', headers)
+    res = conn.getresponse()
+    return json.loads(res.read().decode("utf-8"))
+
+
 def render_video(request):
     template = loader.get_template('app/render_video.html')
     vidstatus = 'No Video Found.'
 
     queue_service = QueueService(account_name=os.environ['SVPD_STORAGE_ACCOUNT_NAME'], account_key=os.environ['SVPD_STORAGE_ACCOUNT_KEY'])
-    messages = queue_service.get_messages(os.environ['SVPD_STORAGE_ACCOUNT_READY_TO_ENCODE'], num_messages=1, visibility_timeout=5*60)
+    messages = queue_service.get_messages(os.environ['SVPD_STORAGE_ACCOUNT_READY_TO_ENCODE'], num_messages=1, visibility_timeout=1*60)
     
     for message in messages:
         vidstatus = 'Queued for Rendering: ' + message.content
+        message_obj = json.loads(message.content)
+
+        access_token = ams_authenticate()['access_token']
+        
+        asset = ams_post_request(access_token, "Assets", {
+            'Name': message_obj['filename'], 
+            'AlternateId': message_obj['folder']})
+        
+        asset_container = urllib.parse.urlparse(asset['Uri']).path[1:]
+
+        asset_file = ams_post_request(access_token, "Files", {
+            'IsEncrypted': 'false',
+            'IsPrimary': 'false',
+            'MimeType': 'video/mp4',
+            'Name': message_obj['filename'],
+            'ParentAssetId': asset['Id']})
+
+        block_blob_service = BlockBlobService(account_name=os.environ['SVPD_STORAGE_ACCOUNT_NAME'], account_key=os.environ['SVPD_STORAGE_ACCOUNT_KEY'])
+        from_url = block_blob_service.make_blob_url(os.environ['SVPD_STORAGE_ACCOUNT_UPLOADED'], message_obj['folder'] + '/' + message_obj['filename'])
+        block_blob_service.copy_blob(asset_container, message_obj['filename'], from_url)
+
+        ams_merge_request(access_token, "Files", asset_file['Id'], {
+            'ContentFileSize': message_obj['size'],
+            'Id': asset_file['Id'],
+            'MimeType': 'video/mp4',
+            'Name': message_obj['filename'],
+            'ParentAssetId': asset['Id']})
+
+        job = ams_verbose_post_request(access_token, "Jobs", {
+            'Name': message_obj['filename'], 
+            'InputMediaAssets': [{
+                '__metadata': { 'uri': os.environ['AMS_API_ENDPOINT'] + 'Assets(\'' + asset['Id'] + '\')' }
+            }],
+            'Tasks': [{
+                'Configuration': 'Adaptive Streaming',
+                'MediaProcessorId': 'nb:mpid:UUID:ff4df607-d419-42f0-bc17-a481b1331e56',
+                'TaskBody': '<?xml version="1.0" encoding="utf-16"?><taskBody><inputAsset>JobInputAsset(0)</inputAsset><outputAsset assetCreationOptions="0" assetFormatOption="0" assetName="' + message_obj['filename'] + ' - MES v1.1" storageAccountName="' + os.environ['SVPD_STORAGE_ACCOUNT_NAME'] + '">JobOutputAsset(0)</outputAsset></taskBody>'
+            },{
+                'Configuration': '<?xml version="1.0" encoding="utf-8"?><configuration version="2.0"><input><metadata key="title" value="Azure Friday - Azure Cosmos DB API for Mongo DB" /></input><settings></settings><features><feature name="ASR"><settings><add key="Language" value="English" /><add key="GenerateAIB" value="False" /><add key="GenerateKeywords" value="True" /><add key="ForceFullCaption" value="False" /><add key="CaptionFormats" value="ttml;sami;webvtt" /></settings></feature></features></configuration>',
+                'MediaProcessorId': 'nb:mpid:UUID:233e57fc-36bb-4f6f-8f18-3b662747a9f8',
+                'TaskBody': '<?xml version="1.0" encoding="utf-16"?><taskBody><inputAsset>JobInputAsset(0)</inputAsset><outputAsset assetCreationOptions="0" assetFormatOption="0" assetName="' + message_obj['filename'] + ' - Indexed" storageAccountName="' + os.environ['SVPD_STORAGE_ACCOUNT_NAME'] + '">JobOutputAsset(1)</outputAsset></taskBody>'
+            }]
+            })
+
         queue_service.delete_message(os.environ['SVPD_STORAGE_ACCOUNT_READY_TO_ENCODE'], message.id, message.pop_receipt)   
 
     return HttpResponse(template.render({

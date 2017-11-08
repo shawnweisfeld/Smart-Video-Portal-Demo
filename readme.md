@@ -234,4 +234,31 @@
     queue_service.put_message(os.environ['SVPD_STORAGE_ACCOUNT_READY_TO_ENCODE'], filename)    
     ```
 
+### Lets send the video we uploaded to Azure Media Services
+
+1. Lets Create the media services account with the portal. [Instructions Here](https://docs.microsoft.com/en-us/azure/media-services/media-services-portal-create-account)
+    1. Be sure to create it in the same resource group we created earlier
+    1. Be sure that we tie it to the storage account we created earlier
+    1. i named mine svpdmediasvc
+
+1. Lets create a service principal for our python app to use to access AMS [Instructions Here](https://docs.microsoft.com/en-us/azure/media-services/media-services-portal-get-started-with-aad#service-principal-authentication)
+    1. The 'Connect to Azure Media Services API' option us under 'API access' in the portal.
+    1. Be sure to 'create a new' Azure AD application, I called mine smart-video-portal-demo
+    1. After you create the application create a client secret
+        1. Click 'Manage application'
+        1. Then 'keys' on the settings blade
+        1. Give your key a description, i called mine webappclient01
+        1. Give your key an expiration, i set mine to never (not recommened for real)
+        1. Press Save
+    1. Copy these 5 values into your dev.env config file
+        1. the client secret that we just generated (AMS_CLIENT_SECRET)
+        1. the application id (aka client id) off of the registered app blade (AMS_CLIENT_ID)
+        1. the three values from the 'connect to media services api' blade 
+            1. Azure AD Tenant domain (AZURE_AD_TENANT_DOMAIN)
+            1. REST API endpoint (AMS_API_ENDPOINT)
+            1. Media Services Resource (AMS_RESOURCE)
+    1. Add an additional environment variable for the STS endpoint AZURE_AD_STS=https://login.microsoftonline.com/microsoft.onmicrosoft.com/oauth2/token
     
+1. Now we can use the AMS Rest endpoint to render our Adaptive Streaming and Closed Captioning files.
+
+### Next we need to monitor for the job to complete and then collect the output files

@@ -260,7 +260,7 @@
     1. Add an additional environment variable for the STS endpoint AZURE_AD_STS=https://login.microsoftonline.com/<AZURE_AD_TENANT_DOMAIN>/oauth2/token
     1. While we are still in the Azure portal lets start our streaming endpoint. [More Info](https://docs.microsoft.com/en-us/azure/media-services/media-services-streaming-endpoints-overview)
     
-1. Now we can use the AMS Rest endpoint to render our Adaptive Streaming and Closed Captioning files.
+1. Now we can use the AMS Rest endpoint to render our Adaptive Streaming and Closed Captioning files. [REST API Docs](https://docs.microsoft.com/en-us/rest/api/media/operations/azure-media-services-rest-api-reference)
     1. First we will need to Authenticate agaist the AMS API, we can do that with the following
 
         ```python
@@ -389,6 +389,9 @@
             ```
 
 ### Next we need to monitor for the job to complete and then collect the output files
+
+> NOTE: there are many ways to do this, I am [polling](https://docs.microsoft.com/en-us/azure/media-services/media-services-rest-check-job-progress) the job status, but you could also have [AMS send notififications to a queue](https://docs.microsoft.com/en-us/azure/media-services/media-services-dotnet-check-job-progress-with-queues) or to a [WebHook](https://docs.microsoft.com/en-us/azure/media-services/media-services-dotnet-check-job-progress-with-webhooks) 
+
 1. The first step is to create a new queue that we can monitor listing videos getting processed. 
 
     > NOTE: We could have AMS list all jobs it has, but we don't know if we created those jobs

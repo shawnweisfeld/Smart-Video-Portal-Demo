@@ -553,5 +553,180 @@
                 'vtt_uri': vtt_uri,
                 'ism_uri': ism_uri
             }, request))
-    
+    ```
+
+### Now we need to save our rendered video/vtt URLs somewhere and display the videos in our web app
+
+> NOTE: I am going to use [Cosmos DB](https://docs.microsoft.com/en-us/azure/cosmos-db/create-documentdb-python) our NoSQL Store, however you can also use a traditional relational database like [SQL Azure](https://docs.microsoft.com/en-us/azure/sql-database/).
+
+1. Create the CosmosDB account, be sure to capture the document endpoint from the json response from Azure into your env settings
+
+    ```bash
+    az cosmosdb create -n svpdsweisfeldb -g svpdResourceGroup
+    ```
+
+1. Next you will need to get the keys for the account we just created, and copy the primary master key into our env settings
+
+    ```bash
+    az cosmosdb list-keys -n svpdsweisfeldb -g svpdResourceGroup
+    ```
+
+1. Next we will need a helper method to create/get a reference to the database
+
+    ```python
+    def docdb_CreateDatabaseIfNotExists(client, id):
+        db = ''
+        databases = list(client.QueryDatabases({
+            "query": "SELECT * FROM r WHERE r.id=@id",
+            "parameters": [
+                { "name":"@id", "value": id }
+            ]
+        }))
+
+        if len(databases) > 0:
+            db = databases[0]
+        else:
+            db = client.CreateDatabase({"id": id})
+        
+        return db
+    ```
+
+1. We will also need a similar helper for the collection 
+
+    ```python
+    def docdb_CreateCollectionIfNotExists(client, db, id):
+        collection = ''
+        collections = list(client.QueryCollections(db['_self'], {
+            "query": "SELECT * FROM r WHERE r.id=@id",
+            "parameters": [
+                { "name":"@id", "value": id }
+            ]
+        }))
+
+        if len(collections) > 0:
+            collection = collections[0]
+        else:
+            collection = client.CreateCollection(db['_self'], { 'id': id }, {
+                'offerEnableRUPerMinuteThroughput': True,
+                'offerVersion': "V2",
+                'offerThroughput': 400
+            })
+
+        return collection
+    ```
+
+1. Finally a helper to execute a SQL query against cosmos
+
+    ```python
+    def docdb_ExecuteQuery(client, collection, query):
+        options = {} 
+        options['enableCrossPartitionQuery'] = True
+
+        result_iterable = client.QueryDocuments(collection['_self'], query, options)
+        return list(result_iterable)
+    ```
+
+1. With the helpers out of the way now before we remove the message from the queue after we do the cleanup after our render is complete, we can add the metadata about the rendered video to the database
+
+    ```python
+    #add the video to the database
+    client = document_client.DocumentClient(os.environ['DOCUMENT_ENDPOINT'], {'masterKey': os.environ['DOCUMENT_KEY']})
+    db = docdb_CreateDatabaseIfNotExists(client, 'svpd')
+    collection = docdb_CreateCollectionIfNotExists(client, db, 'videos')
+
+    doc = client.CreateDocument(collection['_self'],
+    { 
+        'id': message_obj['folder'].replace('/', '.'),
+        'filename': message_obj['filename'],
+        'vtt_uri': vtt_uri,
+        'ism_uri': ism_uri
+    })
+    ```
+
+1. Now we can write a simple page to output the list of all videos in our system
+
+    ```python
+    def videos(request):
+        template = loader.get_template('app/videos.html')
+
+        client = document_client.DocumentClient(os.environ['DOCUMENT_ENDPOINT'], {'masterKey': os.environ['DOCUMENT_KEY']})
+        db = docdb_CreateDatabaseIfNotExists(client, 'svpd')
+        collection = docdb_CreateCollectionIfNotExists(client, db, 'videos')
+
+        videos = docdb_ExecuteQuery(client, collection, {
+            "query": "SELECT videos.id, videos.filename FROM videos",
+            "parameters": [ ]
+        })
+        
+        return HttpResponse(template.render({
+            'videos': videos
+        }, request))    
+    ```
+
+    ```html
+    <ul>
+        {% for video in videos %}
+            <li><a href="/video/{{video.id}}/">{{ video.filename }}</a></li>
+        {% endfor %}
+    </ul>
+    ```
+
+1. And finally a page to display a single video
+
+    ```python
+    def video(request, id):
+        template = loader.get_template('app/video.html')
+
+        client = document_client.DocumentClient(os.environ['DOCUMENT_ENDPOINT'], {'masterKey': os.environ['DOCUMENT_KEY']})
+        db = docdb_CreateDatabaseIfNotExists(client, 'svpd')
+        collection = docdb_CreateCollectionIfNotExists(client, db, 'videos')
+
+        videos = docdb_ExecuteQuery(client, collection, {
+            "query": "SELECT * FROM videos WHERE videos.id=@id",
+            "parameters": [
+                { "name":"@id", "value": id }
+            ]
+        })    
+
+        return HttpResponse(template.render({
+            'videos': videos
+        }, request))        
+    ```
+
+    In your head tag
+
+    ```html
+    <link href="//amp.azure.net/libs/amp/latest/skins/amp-default/azuremediaplayer.min.css" rel="stylesheet">
+    <script src="//amp.azure.net/libs/amp/latest/azuremediaplayer.min.js"></script>
+    ```
+
+    in your body
+
+    ```html
+    <video id="azuremediaplayer" class="azuremediaplayer amp-default-skin amp-big-play-centered" tabindex="0"></video>
+
+    <script type="text/javascript">
+            var myOptions = {
+                "nativeControlsForTouch": false,
+                controls: true,
+                autoplay: true,
+                width: "640",
+                height: "400",
+            }
+            myPlayer = amp("azuremediaplayer", myOptions);
+            myPlayer.src([
+                    {
+                            "src": "{{ video.ism_uri }}",
+                            "type": "application/vnd.ms-sstr+xml"
+                    }
+            ],
+            [
+                    {
+                            "src": "{{ video.vtt_uri }}",
+                            "srclang": "en",
+                            "label": "English",
+                            "kind": "captions"
+                    }
+            ]);
+    </script>
     ```

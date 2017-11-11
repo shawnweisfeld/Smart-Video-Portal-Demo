@@ -1,0 +1,39 @@
+{% extends "app/layout.html" %}
+
+{% block content %}
+
+{% load static %}
+<h1>Video</h1>
+
+{% for video in videos %}
+
+<video id="azuremediaplayer" class="azuremediaplayer amp-default-skin amp-big-play-centered" tabindex="0"></video>
+
+<script type="text/javascript">
+        var myOptions = {
+            "nativeControlsForTouch": false,
+            controls: true,
+            autoplay: true,
+            width: "640",
+            height: "400",
+        }
+        myPlayer = amp("azuremediaplayer", myOptions);
+        myPlayer.src([
+                {
+                        "src": "{{ video.ism_uri }}",
+                        "type": "application/vnd.ms-sstr+xml"
+                }
+        ],
+        [
+                {
+                        "src": "{{ video.vtt_uri }}",
+                        "srclang": "en",
+                        "label": "English",
+                        "kind": "captions"
+                }
+        ]);
+</script>
+
+{% endfor %}
+
+{% endblock %}

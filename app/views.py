@@ -1,7 +1,7 @@
 """
 Definition of views.
 """
-import os, random, string, uuid, datetime, json, http.client, urllib
+import os, random, string, uuid, datetime, json, http.client, urllib, pydocumentdb
 from django.template import loader
 from django.shortcuts import render
 from django.conf import settings
@@ -11,6 +11,7 @@ from django.template import RequestContext
 from azure.storage.blob import BlockBlobService
 from azure.storage.queue import QueueService
 from .forms import UploadFileForm
+import pydocumentdb.document_client as document_client
 
 def home(request):
     """Renders the home page."""
@@ -49,6 +50,9 @@ def upload_file(request):
 
     return HttpResponse(template.render({ }, request))
 
+########################
+##### Azure Media Service helpers
+########################
 def ams_authenticate():
     stsurl = urllib.parse.urlparse(os.environ['AZURE_AD_STS'])
     conn = http.client.HTTPSConnection(stsurl.netloc)
@@ -139,6 +143,53 @@ def ams_delete_request(access_token, uri):
     conn.request("DELETE", requrl.path, '', headers)
     res = conn.getresponse()
     return res.status   
+
+########################
+##### Cosmos DB helpers
+########################
+def docdb_CreateDatabaseIfNotExists(client, id):
+    db = ''
+    databases = list(client.QueryDatabases({
+        "query": "SELECT * FROM r WHERE r.id=@id",
+        "parameters": [
+            { "name":"@id", "value": id }
+        ]
+    }))
+
+    if len(databases) > 0:
+        db = databases[0]
+    else:
+        db = client.CreateDatabase({"id": id})
+    
+    return db
+
+def docdb_CreateCollectionIfNotExists(client, db, id):
+    collection = ''
+    collections = list(client.QueryCollections(db['_self'], {
+        "query": "SELECT * FROM r WHERE r.id=@id",
+        "parameters": [
+            { "name":"@id", "value": id }
+        ]
+    }))
+
+    if len(collections) > 0:
+        collection = collections[0]
+    else:
+        collection = client.CreateCollection(db['_self'], { 'id': id }, {
+            'offerEnableRUPerMinuteThroughput': True,
+            'offerVersion': "V2",
+            'offerThroughput': 400
+        })
+
+    return collection
+
+def docdb_ExecuteQuery(client, collection, query):
+    options = {} 
+    options['enableCrossPartitionQuery'] = True
+
+    result_iterable = client.QueryDocuments(collection['_self'], query, options)
+    return list(result_iterable)
+
 
 def render_video(request):
     template = loader.get_template('app/render_video.html')
@@ -285,6 +336,19 @@ def rendered_video(request):
             ams_delete_request(access_token, os.environ['AMS_API_ENDPOINT'] + 'Assets(\'' + index_asset['Id'] + '\')')
             ams_delete_request(access_token, os.environ['AMS_API_ENDPOINT'] + 'Assets(\'' + input_assets['value'][0]['Id'] + '\')')
 
+            #add the video to the database
+            client = document_client.DocumentClient(os.environ['DOCUMENT_ENDPOINT'], {'masterKey': os.environ['DOCUMENT_KEY']})
+            db = docdb_CreateDatabaseIfNotExists(client, 'svpd')
+            collection = docdb_CreateCollectionIfNotExists(client, db, 'videos')
+
+            doc = client.CreateDocument(collection['_self'],
+            { 
+                'id': message_obj['folder'].replace('/', '.'),
+                'filename': message_obj['filename'],
+                'vtt_uri': vtt_uri,
+                'ism_uri': ism_uri
+            })
+
             #remove the message from the queue
             queue_service.delete_message(os.environ['SVPD_STORAGE_ACCOUNT_ENCODING'], message.id, message.pop_receipt)   
 
@@ -293,3 +357,39 @@ def rendered_video(request):
         'vtt_uri': vtt_uri,
         'ism_uri': ism_uri
     }, request))
+
+
+
+def videos(request):
+    template = loader.get_template('app/videos.html')
+
+    client = document_client.DocumentClient(os.environ['DOCUMENT_ENDPOINT'], {'masterKey': os.environ['DOCUMENT_KEY']})
+    db = docdb_CreateDatabaseIfNotExists(client, 'svpd')
+    collection = docdb_CreateCollectionIfNotExists(client, db, 'videos')
+
+    videos = docdb_ExecuteQuery(client, collection, {
+        "query": "SELECT videos.id, videos.filename FROM videos",
+        "parameters": [ ]
+    })
+    
+    return HttpResponse(template.render({
+        'videos': videos
+    }, request))
+
+def video(request, id):
+    template = loader.get_template('app/video.html')
+
+    client = document_client.DocumentClient(os.environ['DOCUMENT_ENDPOINT'], {'masterKey': os.environ['DOCUMENT_KEY']})
+    db = docdb_CreateDatabaseIfNotExists(client, 'svpd')
+    collection = docdb_CreateCollectionIfNotExists(client, db, 'videos')
+
+    videos = docdb_ExecuteQuery(client, collection, {
+        "query": "SELECT * FROM videos WHERE videos.id=@id",
+        "parameters": [
+            { "name":"@id", "value": id }
+        ]
+    })    
+
+    return HttpResponse(template.render({
+        'videos': videos
+    }, request))    

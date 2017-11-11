@@ -26,4 +26,6 @@ urlpatterns = [
     url(r'^upload/', app.views.upload_file, name='upload'),
     url(r'^render/', app.views.render_video, name='render'),
     url(r'^rendered/', app.views.rendered_video, name='rendered'),     
+    url(r'^videos/', app.views.videos, name='videos'),     
+    url(r'^video/([0-9]{8}\.[A-Za-z0-9]{8}-[A-Za-z0-9]{4}-[A-Za-z0-9]{4}-[A-Za-z0-9]{4}-[A-Za-z0-9]{12})/$', app.views.video, name='video'),
 ]

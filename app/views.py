@@ -207,6 +207,7 @@ def rendered_video(request):
     template = loader.get_template('app/rendered_video.html')
     vidstatus = 'No Running Job Found.'
 
+    # Get the next message from the queue
     queue_service = QueueService(account_name=os.environ['SVPD_STORAGE_ACCOUNT_NAME'], account_key=os.environ['SVPD_STORAGE_ACCOUNT_KEY'])
     messages = queue_service.get_messages(os.environ['SVPD_STORAGE_ACCOUNT_ENCODING'], num_messages=1, visibility_timeout=1*60)
     
@@ -216,16 +217,21 @@ def rendered_video(request):
 
         access_token = ams_authenticate()['access_token']
 
+        # Get the details about the job
         job = ams_get_request(access_token, message_obj['job']['__metadata']['uri'])
 
+        # is it done?
         if job['State'] == 3:
             vidstatus = 'Done Rendering: ' + message.content
 
+            #get a reference to our storage container
             block_blob_service = BlockBlobService(account_name=os.environ['SVPD_STORAGE_ACCOUNT_NAME'], account_key=os.environ['SVPD_STORAGE_ACCOUNT_KEY'])
+            
+            #get a list of all the input and output assets associated to our job
             input_assets = ams_get_request(access_token, message_obj['job']['InputMediaAssets']['__deferred']['uri'])
             output_assets = ams_get_request(access_token, message_obj['job']['OutputMediaAssets']['__deferred']['uri'])
 
-            #copy all the indexer output files into streaming output files folder            
+            #look through the input and output assets to figure out what one is for the indexer and for the Adaptive streaming files        
             index_asset = ''
             stream_asset = ''
             for output_asset in output_assets['value']:
@@ -234,9 +240,11 @@ def rendered_video(request):
                 elif output_asset['Name'].endswith('- MES v1.1'):
                     stream_asset = output_asset
 
+            #Get the storage container names for each
             dest_container = urllib.parse.urlparse(stream_asset['Uri']).path[1:]
             src_container = urllib.parse.urlparse(index_asset['Uri']).path[1:]
             
+            #loop over the indexer output files copying them to the adaptive streaming container
             src_blobs = block_blob_service.list_blobs(src_container)
             for src_blob in src_blobs:
                 block_blob_service.copy_blob(dest_container, src_blob.name, output_asset['Uri'] + '/' + src_blob.name)
@@ -277,6 +285,7 @@ def rendered_video(request):
             ams_delete_request(access_token, os.environ['AMS_API_ENDPOINT'] + 'Assets(\'' + index_asset['Id'] + '\')')
             ams_delete_request(access_token, os.environ['AMS_API_ENDPOINT'] + 'Assets(\'' + input_assets['value'][0]['Id'] + '\')')
 
+            #remove the message from the queue
             queue_service.delete_message(os.environ['SVPD_STORAGE_ACCOUNT_ENCODING'], message.id, message.pop_receipt)   
 
     return HttpResponse(template.render({

@@ -394,8 +394,6 @@
 
 1. The first step is to create a new queue that we can monitor listing videos getting processed. 
 
-    > NOTE: We could have AMS list all jobs it has, but we don't know if we created those jobs
-    
     ```bash
     az storage queue create -n videos-encoding --account-name svpdstorageaccount --account-key YOURKEY
     ```
@@ -410,9 +408,150 @@
         'job': job['d']}))    
     ```
 
-1. poll queue for video
-copy all the index files from the done folder to the folder with the video
-delete the index done asset
-delete the source asset
-create a locator for the done folder
-get the url for the webvtt and manafest files
+1. We will need another helper method to Get information from AMS
+
+    ```python
+    def ams_get_request(access_token, uri):
+        requrl = urllib.parse.urlparse(uri)
+        conn = http.client.HTTPSConnection(requrl.netloc)
+
+        headers = {
+            'x-ms-version': "2.11",
+            'accept': "application/json",
+            'content-type': "application/json",
+            'dataserviceversion': "3.0",
+            'maxdataserviceversion': "3.0",
+            'authorization': "Bearer " + access_token,
+            'cache-control': "no-cache"
+            }
+
+        conn.request("GET", requrl.path, '', headers)
+        res = conn.getresponse()
+        return json.loads(res.read().decode("utf-8"))     
+    ```
+
+1. And a helper method to delete something from AMS
+
+    ```python
+    def ams_delete_request(access_token, uri):
+        requrl = urllib.parse.urlparse(uri)
+        conn = http.client.HTTPSConnection(requrl.netloc)
+
+        headers = {
+            'x-ms-version': "2.11",
+            'accept': "application/json",
+            'content-type': "application/json",
+            'dataserviceversion': "3.0",
+            'maxdataserviceversion': "3.0",
+            'authorization': "Bearer " + access_token,
+            'cache-control': "no-cache"
+            }
+
+        conn.request("DELETE", requrl.path, '', headers)
+        res = conn.getresponse()
+        return res.status   
+    ```
+
+1. Next we need to get the assets from the renderer ready for our media player. This process takes a few steps
+    1. Get the message from the queue. Note when we get the message we set its timeout to a minute. So if the job is not complete we will not see the message in the queue again for another minute. 
+    1. Assumign we have a message, is the job it references finished rendering?
+    1. If so lets consolidate our output assets in one folder, and get rid of the other two
+    1. Finally we create a locator, this provides a public URL that we can put in the [AMS player](http://ampdemo.azureedge.net) for our video so people can watch it. 
+
+    Here is my code to the above:
+
+    ```python
+        def rendered_video(request):
+            ism_uri = ''
+            vtt_uri = ''
+            template = loader.get_template('app/rendered_video.html')
+            vidstatus = 'No Running Job Found.'
+
+            # Get the next message from the queue
+            queue_service = QueueService(account_name=os.environ['SVPD_STORAGE_ACCOUNT_NAME'], account_key=os.environ['SVPD_STORAGE_ACCOUNT_KEY'])
+            messages = queue_service.get_messages(os.environ['SVPD_STORAGE_ACCOUNT_ENCODING'], num_messages=1, visibility_timeout=1*60)
+            
+            for message in messages:
+                vidstatus = 'Rendering: ' + message.content
+                message_obj = json.loads(message.content)
+
+                access_token = ams_authenticate()['access_token']
+
+                # Get the details about the job
+                job = ams_get_request(access_token, message_obj['job']['__metadata']['uri'])
+
+                # is it done?
+                if job['State'] == 3:
+                    vidstatus = 'Done Rendering: ' + message.content
+
+                    #get a reference to our storage container
+                    block_blob_service = BlockBlobService(account_name=os.environ['SVPD_STORAGE_ACCOUNT_NAME'], account_key=os.environ['SVPD_STORAGE_ACCOUNT_KEY'])
+                    
+                    #get a list of all the input and output assets associated to our job
+                    input_assets = ams_get_request(access_token, message_obj['job']['InputMediaAssets']['__deferred']['uri'])
+                    output_assets = ams_get_request(access_token, message_obj['job']['OutputMediaAssets']['__deferred']['uri'])
+
+                    #look through the input and output assets to figure out what one is for the indexer and for the Adaptive streaming files        
+                    index_asset = ''
+                    stream_asset = ''
+                    for output_asset in output_assets['value']:
+                        if output_asset['Name'].endswith('- Indexed'):
+                            index_asset = output_asset
+                        elif output_asset['Name'].endswith('- MES v1.1'):
+                            stream_asset = output_asset
+
+                    #Get the storage container names for each
+                    dest_container = urllib.parse.urlparse(stream_asset['Uri']).path[1:]
+                    src_container = urllib.parse.urlparse(index_asset['Uri']).path[1:]
+                    
+                    #loop over the indexer output files copying them to the adaptive streaming container
+                    src_blobs = block_blob_service.list_blobs(src_container)
+                    for src_blob in src_blobs:
+                        block_blob_service.copy_blob(dest_container, src_blob.name, output_asset['Uri'] + '/' + src_blob.name)
+
+                    #create the access policy if it doen't exist
+                    access_policies = ams_get_request(access_token, os.environ['AMS_API_ENDPOINT'] + 'AccessPolicies')
+                    access_policy_id = ''
+                    for access_policy in access_policies['value']:
+                        if access_policy['Name'] == 'StreamingAccessPolicy':
+                            access_policy_id = access_policy['Id']
+
+                    if access_policy_id == '':
+                        access_policy = ams_verbose_post_request(access_token, 'AccessPolicies', {
+                        'Name': 'StreamingAccessPolicy',
+                        'DurationInMinutes': '52594560',
+                        'Permissions': '9'
+                        })
+                        access_policy_id = access_policy['d']['Id']
+
+                    #create the locator
+                    locator = ams_verbose_post_request(access_token, 'Locators', {
+                        'AccessPolicyId': access_policy_id,
+                        'AssetId': stream_asset['Id'],
+                        'Type': 2
+                        })
+
+                    #get the URLs to the streaming endpoint and the vtt file
+                    locator_asset_files = ams_get_request(access_token, os.environ['AMS_API_ENDPOINT'] + 'Assets(\'' + locator['d']['AssetId']  + '\')/Files')
+                    for locator_asset_file in locator_asset_files['value']:
+                        if locator_asset_file['Name'].endswith('.ism'):
+                            ism_uri = locator['d']['Path'] + locator_asset_file['Name'] + '/manifest'
+                            vtt_uri = locator['d']['Path'] + message_obj['filename'] + '.vtt'
+
+                    #delete the job
+                    ams_delete_request(access_token, message_obj['job']['__metadata']['uri'])
+
+                    #delete the unused assets
+                    ams_delete_request(access_token, os.environ['AMS_API_ENDPOINT'] + 'Assets(\'' + index_asset['Id'] + '\')')
+                    ams_delete_request(access_token, os.environ['AMS_API_ENDPOINT'] + 'Assets(\'' + input_assets['value'][0]['Id'] + '\')')
+
+                    #remove the message from the queue
+                    queue_service.delete_message(os.environ['SVPD_STORAGE_ACCOUNT_ENCODING'], message.id, message.pop_receipt)   
+
+            return HttpResponse(template.render({
+                'vidstatus': vidstatus,
+                'vtt_uri': vtt_uri,
+                'ism_uri': ism_uri
+            }, request))
+    
+    ```

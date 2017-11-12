@@ -740,3 +740,25 @@ myPlayer.addEventListener('timeupdate', function() {
         document.getElementById("currentTime").innerHTML = myPlayer.currentTime();
 })
 ```
+
+### Make transcription searchable with Azure Search
+
+1. When our videos finish rendering we will need to parse the VTT file into a json document. Store that json document into a collection in document DB, i.e. en-transcript. We will then need a django method to render the file back out to vtt format, and then we can point our player at that file, insted of the static one on disk. 
+1. Once that is complete we can enable Azure Search to index our english transcript collection [more info](https://docs.microsoft.com/en-us/azure/search/search-howto-index-documentdb) and then build the UI to expose the search index to the user. 
+
+### Translate text transcription to Spanish text (Translator API)
+
+1. Once we have the VTT file converted to an english json document, we can send it line by line to the Text Translator API to get converted to other languages. [Here](https://github.com/MicrosoftTranslator/PythonConsole) is an example of how to do this in python. Once each line is converted, we can then write to another collection in document db the translated VTT file, and leverage the django method to convert the json document stored in Cosmos back into a VTT file, we can also wire up Azure Search to search the additional language.  
+
+### Allow user to switch closed captioning and transcription between languages
+
+1. This functionality is built into the player, however we can use the getCurrentTextTrack to see what language they have selected. 
+
+### Convert Spanish text to audio (Speech API)
+
+1. We have a simple [REST API](https://docs.microsoft.com/en-us/azure/cognitive-services/speech/api-reference-rest/bingvoiceoutput) to convert the text that we translated earlier into an audio file. However how do we present this to the user. One option would be to let the video play in its original language, and if the user is showing a transcript in a different language, give them an icon to click to pause the video and play that line in the other language. 
+1. Another option would be to re-render the video adding a second audio track with the translated lanaguage, however you would then need to reconcile what to do if the translated sentence, took shorter/longer to say than the original. 
+
+### Content Moderation using Content Moderator API Cognitive Services
+
+1.  [More Info here](https://docs.microsoft.com/en-us/azure/cognitive-services/content-moderator/text-moderation-api)

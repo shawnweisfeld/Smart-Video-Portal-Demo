@@ -8,6 +8,7 @@
 {% for video in videos %}
 
 <div id="currentTime"></div>
+<div id="sourceset"></div>
 
 <hr />
 
@@ -38,7 +39,16 @@
         ]);
         myPlayer.addEventListener('timeupdate', function() {
              document.getElementById("currentTime").innerHTML = myPlayer.currentTime();
+
+             if (myPlayer.getCurrentTextTrack() === undefined){
+                document.getElementById("sourceset").innerHTML = "No Language Selected";
+             } else {
+                document.getElementById("sourceset").innerHTML = myPlayer.getCurrentTextTrack().label;
+             }
         })
+        myPlayer.addEventListener('sourceset', function() {
+             
+        })        
 </script>
 
 {% endfor %}

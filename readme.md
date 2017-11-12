@@ -730,3 +730,13 @@
             ]);
     </script>
     ```
+
+### Our next task is to add a transcription syncronized to the video. 
+
+The majority of this is task is just javascript. However the interesting bit is how to get the current position of the playhead from the Azure Media Services Player. Good news for us they made this super easy as we can attach a event listener to the player asking it to notify us every time the play head moves. Once we grab the time code, we can do whatever interesting things we want with it. More info on the [currentTime method](https://amp.azure.net/libs/amp/latest/docs/index.html#amp.player.currenttime) and the players [addEventListener method](https://amp.azure.net/libs/amp/latest/docs/index.html#amp.player.addeventlistener).
+
+```javascript
+myPlayer.addEventListener('timeupdate', function() {
+        document.getElementById("currentTime").innerHTML = myPlayer.currentTime();
+})
+```

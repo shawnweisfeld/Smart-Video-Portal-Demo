@@ -7,6 +7,10 @@
 
 {% for video in videos %}
 
+<div id="currentTime"></div>
+
+<hr />
+
 <video id="azuremediaplayer" class="azuremediaplayer amp-default-skin amp-big-play-centered" tabindex="0"></video>
 
 <script type="text/javascript">
@@ -32,6 +36,9 @@
                         "kind": "captions"
                 }
         ]);
+        myPlayer.addEventListener('timeupdate', function() {
+             document.getElementById("currentTime").innerHTML = myPlayer.currentTime();
+        })
 </script>
 
 {% endfor %}

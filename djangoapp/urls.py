@@ -29,5 +29,6 @@ urlpatterns = [
     url(r'^videos/', app.views.videos, name='videos'),     
     url(r'^video/([0-9]{8}\.[A-Za-z0-9]{8}-[A-Za-z0-9]{4}-[A-Za-z0-9]{4}-[A-Za-z0-9]{4}-[A-Za-z0-9]{12})/$', app.views.video, name='video'),
     url(r'^translate/', app.views.translate, name='translate'),
+    url(r'^batch_translate/', app.views.batch_translate, name='batch_translate'),
     url(r'^speak/', app.views.speak, name='speak'),
 ]

@@ -429,7 +429,41 @@ def translate(request):
       'toLangCode': toLangCode,
       'textToTranslate': textToTranslate,
       'translation': translation
-    }, request))    
+    }, request)) 
+
+def batch_translate(request):
+    template = loader.get_template('app/batch_translate.html')
+
+    textToTranslate = 'The quick brown fox jumped over the red lazy dog.'
+
+    requrl = urllib.parse.urlparse(os.environ['CS_TRANSLATOR_SVC'] + 'TranslateArray')
+    conn = http.client.HTTPSConnection(requrl.netloc)
+    
+    headers = {
+        'Ocp-Apim-Subscription-Key': os.environ['CS_TRANSLATOR_KEY'],
+        'Content-Type': 'application/xml',
+        'cache-control': 'no-cache'
+        }
+
+    tar = ET.Element('TranslateArrayRequest')
+    ET.SubElement(tar, 'AppId')
+    ET.SubElement(tar, 'From').text = 'en'
+    #tar_opt = ET.SubElement(tar, 'Options')
+    tar_texts = ET.SubElement(tar, 'Texts')
+
+    for num in range(1,10):
+        ET.SubElement(tar_texts, 'string', xmlns='http://schemas.microsoft.com/2003/10/Serialization/Arrays').text = textToTranslate
+
+    ET.SubElement(tar, 'To').text = 'es'
+ 
+    conn.request("POST", requrl.path, ET.tostring(tar), headers)
+    res = conn.getresponse()
+    translation = res.read().decode("utf-8")
+
+    return HttpResponse(template.render({
+       'translation': translation,
+        'body': ET.tostring(tar)
+    }, request))        
 
 def speak(request):
     language = 'es'

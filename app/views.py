@@ -431,6 +431,8 @@ def translate(request):
       'translation': translation
     }, request)) 
 
+# The total of all texts to be translated must not exceed 10000 characters. The maximum number of array elements is 2000.
+
 def batch_translate(request):
     template = loader.get_template('app/batch_translate.html')
 

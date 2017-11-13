@@ -12,6 +12,7 @@ from azure.storage.blob import BlockBlobService
 from azure.storage.queue import QueueService
 from .forms import UploadFileForm
 import pydocumentdb.document_client as document_client
+import xml.etree.ElementTree as ET
 
 def home(request):
     """Renders the home page."""
@@ -394,6 +395,8 @@ def video(request, id):
         'videos': videos
     }, request))    
 
+# http://docs.microsofttranslator.com/text-translate.html
+
 def translate(request):
     template = loader.get_template('app/translate.html')
 
@@ -401,11 +404,11 @@ def translate(request):
     toLangCode = 'es'
     textToTranslate = 'The quick brown fox jumped over the red lazy dog.'
 
-    requrl = urllib.parse.urlparse(os.environ['CS_TRANSLATOR_TEXT_SVC'])
+    requrl = urllib.parse.urlparse(os.environ['CS_TRANSLATOR_SVC'] + 'Translate')
     conn = http.client.HTTPSConnection(requrl.netloc)
     
     headers = {
-        'Ocp-Apim-Subscription-Key': os.environ['CS_TRANSLATOR_TEXT_KEY'],
+        'Ocp-Apim-Subscription-Key': os.environ['CS_TRANSLATOR_KEY'],
         'cache-control': 'no-cache'
         }
 
@@ -418,7 +421,8 @@ def translate(request):
 
     conn.request("GET", requrl.path + '?' + payload, '', headers)
     res = conn.getresponse()
-    translation = res.read().decode("utf-8")
+    xml = ET.fromstring(res.read().decode("utf-8"))
+    translation = xml.text
 
     return HttpResponse(template.render({
       'fromLangCode': fromLangCode,
@@ -431,11 +435,11 @@ def speak(request):
     language = 'es'
     text = 'El zorro marrón rápido salta sobre el gran perro rojo.'
 
-    requrl = urllib.parse.urlparse(os.environ['CS_TRANSLATOR_SPEAK_SVC'])
+    requrl = urllib.parse.urlparse(os.environ['CS_TRANSLATOR_SVC'] + 'Speak')
     conn = http.client.HTTPSConnection(requrl.netloc)
     
     headers = {
-        'Ocp-Apim-Subscription-Key': os.environ['CS_TRANSLATOR_SPEAK_KEY'],
+        'Ocp-Apim-Subscription-Key': os.environ['CS_TRANSLATOR_KEY'],
         'cache-control': 'no-cache'
         }
 

@@ -393,3 +393,59 @@ def video(request, id):
     return HttpResponse(template.render({
         'videos': videos
     }, request))    
+
+def translate(request):
+    template = loader.get_template('app/translate.html')
+
+    fromLangCode = 'en'
+    toLangCode = 'es'
+    textToTranslate = 'The quick brown fox jumped over the red lazy dog.'
+
+    requrl = urllib.parse.urlparse(os.environ['CS_TRANSLATOR_TEXT_SVC'])
+    conn = http.client.HTTPSConnection(requrl.netloc)
+    
+    headers = {
+        'Ocp-Apim-Subscription-Key': os.environ['CS_TRANSLATOR_TEXT_KEY'],
+        'cache-control': 'no-cache'
+        }
+
+    payload = urllib.parse.urlencode({ 
+        'appid': '',
+        'text': textToTranslate,
+        'from': fromLangCode,
+        'to': toLangCode
+        })
+
+    conn.request("GET", requrl.path + '?' + payload, '', headers)
+    res = conn.getresponse()
+    translation = res.read().decode("utf-8")
+
+    return HttpResponse(template.render({
+      'fromLangCode': fromLangCode,
+      'toLangCode': toLangCode,
+      'textToTranslate': textToTranslate,
+      'translation': translation
+    }, request))    
+
+def speak(request):
+    language = 'es'
+    text = 'El zorro marrón rápido salta sobre el gran perro rojo.'
+
+    requrl = urllib.parse.urlparse(os.environ['CS_TRANSLATOR_SPEAK_SVC'])
+    conn = http.client.HTTPSConnection(requrl.netloc)
+    
+    headers = {
+        'Ocp-Apim-Subscription-Key': os.environ['CS_TRANSLATOR_SPEAK_KEY'],
+        'cache-control': 'no-cache'
+        }
+
+    payload = urllib.parse.urlencode({ 
+        'appid': '',
+        'text': text,
+        'language': language,
+        'format': 'audio/mp3'
+        })
+
+    conn.request("GET", requrl.path + '?' + payload, '', headers)
+   
+    return HttpResponse(conn.getresponse(), content_type='audio/mpeg')

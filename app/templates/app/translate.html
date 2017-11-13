@@ -1,0 +1,14 @@
+{% extends "app/layout.html" %}
+
+{% block content %}
+
+{% load static %}
+<h1>Translate</h1>
+
+
+<!-- <p>Auth Token: {{ token }}</p> -->
+<p>From: {{ fromLangCode }} To: {{ toLangCode }}</p>
+<p>Orig: {{ textToTranslate }}</p>
+<p>Translation: {{ translation }}</p>
+
+{% endblock %}

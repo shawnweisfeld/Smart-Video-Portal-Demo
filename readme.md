@@ -25,7 +25,7 @@
 1. [Python Developer Center](https://azure.microsoft.com/en-us/develop/python/)
 1. [Use a custom Docker image for Web App for Containers](https://docs.microsoft.com/en-us/azure/app-service/containers/tutorial-custom-docker-image)
 1. [Continuous deployment with Web App for Containers](https://docs.microsoft.com/en-us/azure/app-service/containers/app-service-linux-ci-cd)
-
+1. [Python and Azure Service Bus Queues](https://docs.microsoft.com/en-us/azure/service-bus-messaging/service-bus-python-how-to-use-topics-subscriptions)
 ## Prerequisites
 
 1. [Windows Subsystem for Linux](https://msdn.microsoft.com/en-us/commandline/wsl/install-win10)
